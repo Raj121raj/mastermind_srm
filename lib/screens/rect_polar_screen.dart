@@ -19,8 +19,8 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
   final TextEditingController _magController = TextEditingController();
   final TextEditingController _angleController = TextEditingController();
   List<FlSpot> _rectSpots = [];
-  List<Map<String, String>> _rectPoints = []; // Store (x, y) pairs
-  List<Map<String, String>> _polarPoints = []; // Store (r, θ) pairs
+  List<Map<String, String>> _rectPoints = [];
+  List<Map<String, String>> _polarPoints = [];
   static const double _maxValueGraph = 1000.0;
   String? _prevRealValue;
   String? _prevImagValue;
@@ -28,6 +28,8 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
   String? _prevAngleValue;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  bool _showRectFormula = false;
+  bool _showPolarFormula = false;
 
   @override
   void initState() {
@@ -83,7 +85,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
           _prevRealValue = real;
           _prevImagValue = imag;
           _rectPoints.add({'real': real, 'imag': imag});
-          _polarPoints.clear(); // Clear opposite list
+          _polarPoints.clear();
           _polarResult = Conversions.rectToPolar(real, imag);
           _magController.clear();
           _angleController.clear();
@@ -107,7 +109,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
           _prevMagValue = mag;
           _prevAngleValue = angle;
           _polarPoints.add({'mag': mag, 'angle': angle});
-          _rectPoints.clear(); // Clear opposite list
+          _rectPoints.clear();
           _rectResult = Conversions.polarToRect(mag, angle);
           _realController.clear();
           _imagController.clear();
@@ -340,8 +342,24 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                           onPressed: _undoRect,
                           tooltip: 'Undo',
                         ),
+                        IconButton(
+                          icon: Icon(_showRectFormula ? Icons.close : Icons.functions),
+                          onPressed: () {
+                            setState(() {
+                              _showRectFormula = !_showRectFormula;
+                            });
+                          },
+                          tooltip: 'Show Formula',
+                        ),
                       ],
                     ),
+                    if (_showRectFormula) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Formula: r = sqrt(x^2 + y^2), θ = atan2(y, x) * 180 / π',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -443,8 +461,24 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                           onPressed: _undoPolar,
                           tooltip: 'Undo',
                         ),
+                        IconButton(
+                          icon: Icon(_showPolarFormula ? Icons.close : Icons.functions),
+                          onPressed: () {
+                            setState(() {
+                              _showPolarFormula = !_showPolarFormula;
+                            });
+                          },
+                          tooltip: 'Show Formula',
+                        ),
                       ],
                     ),
+                    if (_showPolarFormula) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Formula: x = r * cos(θ * π / 180), y = r * sin(θ * π / 180)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -25,6 +25,8 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
   String? _prevWavelengthValue;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  bool _showFreqFormula = false;
+  bool _showWavelengthFormula = false;
 
   @override
   void initState() {
@@ -297,8 +299,24 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
                           onPressed: _undoFreq,
                           tooltip: 'Undo',
                         ),
+                        IconButton(
+                          icon: Icon(_showFreqFormula ? Icons.close : Icons.functions),
+                          onPressed: () {
+                            setState(() {
+                              _showFreqFormula = !_showFreqFormula;
+                            });
+                          },
+                          tooltip: 'Show Formula',
+                        ),
                       ],
                     ),
+                    if (_showFreqFormula) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Formula: λ(m) = c / f(Hz), where c = 299792458 m/s',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -392,8 +410,24 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
                           onPressed: _undoWavelength,
                           tooltip: 'Undo',
                         ),
+                        IconButton(
+                          icon: Icon(_showWavelengthFormula ? Icons.close : Icons.functions),
+                          onPressed: () {
+                            setState(() {
+                              _showWavelengthFormula = !_showWavelengthFormula;
+                            });
+                          },
+                          tooltip: 'Show Formula',
+                        ),
                       ],
                     ),
+                    if (_showWavelengthFormula) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Formula: f(Hz) = c / λ(m), where c = 299792458 m/s',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                      ),
+                    ],
                   ],
                 ),
               ),

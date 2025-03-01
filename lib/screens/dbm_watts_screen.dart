@@ -19,12 +19,14 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
   List<FlSpot> _dbmWattsSpots = [];
   static const double _maxDbmGraph = 100.0;
   static const double _maxWattsGraph = 10000.0;
-  String _dbmUnit = 'dBm'; // Fixed unit
-  String _wattsUnit = 'W'; // Default unit
+  String _dbmUnit = 'dBm';
+  String _wattsUnit = 'W';
   String? _prevDbmValue;
   String? _prevWattsValue;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  bool _showDbmFormula = false;
+  bool _showWattsFormula = false;
 
   @override
   void initState() {
@@ -269,8 +271,24 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
                           onPressed: _undoDbm,
                           tooltip: 'Undo',
                         ),
+                        IconButton(
+                          icon: Icon(_showDbmFormula ? Icons.close : Icons.functions),
+                          onPressed: () {
+                            setState(() {
+                              _showDbmFormula = !_showDbmFormula;
+                            });
+                          },
+                          tooltip: 'Show Formula',
+                        ),
                       ],
                     ),
+                    if (_showDbmFormula) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Formula: P(W) = 10^((P(dBm) - 30) / 10)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -364,8 +382,24 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
                           onPressed: _undoWatts,
                           tooltip: 'Undo',
                         ),
+                        IconButton(
+                          icon: Icon(_showWattsFormula ? Icons.close : Icons.functions),
+                          onPressed: () {
+                            setState(() {
+                              _showWattsFormula = !_showWattsFormula;
+                            });
+                          },
+                          tooltip: 'Show Formula',
+                        ),
                       ],
                     ),
+                    if (_showWattsFormula) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Formula: P(dBm) = 10 * log10(P(W) * 1000)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                      ),
+                    ],
                   ],
                 ),
               ),
