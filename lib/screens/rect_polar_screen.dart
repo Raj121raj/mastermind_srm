@@ -123,6 +123,11 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                       'Rectangular to Polar',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Shifts from rectangular (real, imaginary) to polar (magnitude, angle) form. It unveils the length and direction of a complex number’s journey.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _realController,
@@ -180,6 +185,11 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                       'Polar to Rectangular',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Maps polar (magnitude, angle) to rectangular (real, imaginary) coordinates. It traces the path of magnitude and angle back to the Cartesian plane.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _magController,
@@ -225,7 +235,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (_rectSpots.isNotEmpty)
+            if (_rectSpots.isNotEmpty) ...[
               SizedBox(
                 height: 250,
                 child: ScatterChart(
@@ -281,6 +291,23 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Caution: The plot pauses at a magnitude of 1000. Venture beyond, and it offers a modest echo of coordinates in tranquil bounds.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                        fontStyle: FontStyle.italic,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ],
         ),
       ),

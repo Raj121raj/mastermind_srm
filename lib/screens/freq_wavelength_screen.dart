@@ -118,6 +118,11 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                       'Frequency to Wavelength',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Translates frequency (Hz) to wavelength (m) using the speed of light (c ≈ 299,792,458 m/s). Higher frequencies mean shorter wavelengths.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _freqController,
@@ -155,6 +160,11 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                       'Wavelength to Frequency',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Converts wavelength (m) to frequency (Hz) with the speed of light as the bridge. Longer wavelengths correspond to lower frequencies.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _wavelengthController,
@@ -180,7 +190,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (_freqWavelengthSpots.isNotEmpty)
+            if (_freqWavelengthSpots.isNotEmpty) ...[
               SizedBox(
                 height: 250,
                 child: LineChart(
@@ -235,6 +245,23 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Behold: The graph dances only up to 1 THz or 1000 m. Beyond these ethereal bounds, it sketches a humble tale of waves in serene restraint.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                        fontStyle: FontStyle.italic,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ],
         ),
       ),

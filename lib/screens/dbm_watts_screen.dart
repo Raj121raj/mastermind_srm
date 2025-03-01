@@ -118,6 +118,11 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                       'dBm to Watts',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Converts power from decibel-milliwatts (dBm) to watts (W). This logarithmic scale measures power relative to 1 milliwatt, where 0 dBm equals 0.001 W.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _dbmController,
@@ -155,6 +160,11 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                       'Watts to dBm',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Transforms power in watts (W) to decibel-milliwatts (dBm). It expresses power on a logarithmic scale, making large ranges easier to compare.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _wattsController,
@@ -180,7 +190,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (_dbmWattsSpots.isNotEmpty)
+            if (_dbmWattsSpots.isNotEmpty) ...[
               SizedBox(
                 height: 250,
                 child: LineChart(
@@ -235,6 +245,23 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Note: The graph whispers its limits at 100 dBm or 10,000 W. Beyond these horizons, it paints a gentle, generic curve of power’s dance.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                        fontStyle: FontStyle.italic,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ],
         ),
       ),
