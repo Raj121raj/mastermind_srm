@@ -11,7 +11,7 @@ class RectPolarScreen extends StatefulWidget {
   _RectPolarScreenState createState() => _RectPolarScreenState();
 }
 
-class _RectPolarScreenState extends State<RectPolarScreen> {
+class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProviderStateMixin {
   String _polarResult = '';
   String _rectResult = '';
   final TextEditingController _realController = TextEditingController();
@@ -20,15 +20,29 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
   final TextEditingController _angleController = TextEditingController();
   List<FlSpot> _rectSpots = [];
   static const double _maxValueGraph = 1000.0;
-  String? _prevRealValue; // Store previous Real input
-  String? _prevImagValue; // Store previous Imag input
-  String? _prevMagValue; // Store previous Magnitude input
-  String? _prevAngleValue; // Store previous Angle input
+  String? _prevRealValue;
+  String? _prevImagValue;
+  String? _prevMagValue;
+  String? _prevAngleValue;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _loadCache();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _realController.dispose();
+    _imagController.dispose();
+    _magController.dispose();
+    _angleController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCache() async {
@@ -57,6 +71,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
   void _updateGraphFromRect(String real, String imag) {
     if (real.isEmpty || imag.isEmpty) {
       setState(() => _rectSpots = []);
+      _animationController.reverse();
       return;
     }
     try {
@@ -64,6 +79,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
       double y = double.parse(imag);
       if (x.isNaN || y.isNaN || x.isInfinite || y.isInfinite) {
         setState(() => _rectSpots = []);
+        _animationController.reverse();
         return;
       }
       double graphX = x.abs() > _maxValueGraph ? (_maxValueGraph * x.sign) : x;
@@ -76,14 +92,17 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
         CacheManager.saveCache(CacheManager.imagKey, imag);
         CacheManager.addToHistory('Rect to Polar: ($real, $imag) = $_polarResult');
       });
+      _animationController.forward(from: 0);
     } catch (e) {
       setState(() => _rectSpots = []);
+      _animationController.reverse();
     }
   }
 
   void _updateGraphFromPolar(String magnitude, String angle) {
     if (magnitude.isEmpty || angle.isEmpty) {
       setState(() => _rectSpots = []);
+      _animationController.reverse();
       return;
     }
     try {
@@ -91,6 +110,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
       double thetaDeg = double.parse(angle);
       if (r < 0 || r.isNaN || thetaDeg.isNaN || r.isInfinite || thetaDeg.isInfinite) {
         setState(() => _rectSpots = []);
+        _animationController.reverse();
         return;
       }
       double graphR = min(r, _maxValueGraph);
@@ -105,8 +125,10 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
         CacheManager.saveCache(CacheManager.angleKey, angle);
         CacheManager.addToHistory('Polar to Rect: ($magnitude, $angle°) = $_rectResult');
       });
+      _animationController.forward(from: 0);
     } catch (e) {
       setState(() => _rectSpots = []);
+      _animationController.reverse();
     }
   }
 
@@ -267,7 +289,14 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Result: $_polarResult', style: Theme.of(context).textTheme.bodyLarge),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Result: $_polarResult',
+                              key: ValueKey(_polarResult),
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.undo),
@@ -370,7 +399,14 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Result: $_rectResult', style: Theme.of(context).textTheme.bodyLarge),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Result: $_rectResult',
+                              key: ValueKey(_rectResult),
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.undo),
@@ -385,58 +421,64 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
             ),
             const SizedBox(height: 24),
             if (_rectSpots.isNotEmpty) ...[
-              SizedBox(
-                height: 250,
-                child: ScatterChart(
-                  ScatterChartData(
-                    scatterSpots: _rectSpots
-                        .map((spot) => ScatterSpot(
-                              spot.x,
-                              spot.y,
-                              dotPainter: FlDotCirclePainter(
-                                radius: 8,
-                                color: Theme.of(context).colorScheme.primary,
+              AnimatedBuilder(
+                animation: _fadeAnimation,
+                builder: (context, child) => FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SizedBox(
+                    height: 250,
+                    child: ScatterChart(
+                      ScatterChartData(
+                        scatterSpots: _rectSpots
+                            .map((spot) => ScatterSpot(
+                                  spot.x,
+                                  spot.y,
+                                  dotPainter: FlDotCirclePainter(
+                                    radius: 8 + (sqrt(spot.x * spot.x + spot.y * spot.y) / _maxValueGraph * 4),
+                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                  ),
+                                ))
+                            .toList(),
+                        gridData: const FlGridData(show: true),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 50,
+                              interval: max(1.0, (_rectSpots.last.y - _rectSpots.first.y).abs() / 3),
+                              getTitlesWidget: (value, meta) => SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                child: Text(
+                                  value.toStringAsFixed(1),
+                                  style: const TextStyle(fontSize: 10),
+                                ),
                               ),
-                            ))
-                        .toList(),
-                    gridData: const FlGridData(show: true),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 50,
-                          interval: max(1.0, (_rectSpots.last.y - _rectSpots.first.y).abs() / 3),
-                          getTitlesWidget: (value, meta) => SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            child: Text(
-                              value.toStringAsFixed(1),
-                              style: const TextStyle(fontSize: 10),
                             ),
                           ),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 40,
-                          interval: max(1.0, (_rectSpots.last.x - _rectSpots.first.x).abs() / 3),
-                          getTitlesWidget: (value, meta) => SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            child: Text(
-                              value.toStringAsFixed(1),
-                              style: const TextStyle(fontSize: 10),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              interval: max(1.0, (_rectSpots.last.x - _rectSpots.first.x).abs() / 3),
+                              getTitlesWidget: (value, meta) => SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                child: Text(
+                                  value.toStringAsFixed(1),
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ),
                             ),
                           ),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
+                        borderData: FlBorderData(show: true),
+                        minX: _rectSpots.first.x - 1,
+                        maxX: _rectSpots.last.x + 1,
+                        minY: _rectSpots.first.y - 1,
+                        maxY: _rectSpots.last.y + 1,
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    borderData: FlBorderData(show: true),
-                    minX: _rectSpots.first.x - 1,
-                    maxX: _rectSpots.last.x + 1,
-                    minY: _rectSpots.first.y - 1,
-                    maxY: _rectSpots.last.y + 1,
                   ),
                 ),
               ),

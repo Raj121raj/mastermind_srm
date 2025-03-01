@@ -11,7 +11,7 @@ class DbmWattsScreen extends StatefulWidget {
   _DbmWattsScreenState createState() => _DbmWattsScreenState();
 }
 
-class _DbmWattsScreenState extends State<DbmWattsScreen> {
+class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProviderStateMixin {
   String _wattsResult = '';
   String _dbmResult = '';
   final TextEditingController _dbmController = TextEditingController();
@@ -21,13 +21,25 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
   static const double _maxWattsGraph = 10000.0;
   String _dbmUnit = 'dBm'; // Fixed unit
   String _wattsUnit = 'W'; // Default unit
-  String? _prevDbmValue; // Store previous dBm input
-  String? _prevWattsValue; // Store previous Watts input
+  String? _prevDbmValue;
+  String? _prevWattsValue;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _loadCache();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _dbmController.dispose();
+    _wattsController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCache() async {
@@ -53,20 +65,22 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
         _wattsResult = '';
         _dbmWattsSpots = [];
       });
+      _animationController.reverse();
       return;
     }
     try {
-      double dbmValue = double.parse(dbm); // Only dBm unit allowed
+      double dbmValue = double.parse(dbm);
       if (dbmValue.isNaN || dbmValue.isInfinite) {
         setState(() {
           _wattsResult = '';
           _dbmWattsSpots = [];
         });
+        _animationController.reverse();
         return;
       }
       double graphDbm = min(dbmValue, _maxDbmGraph);
       setState(() {
-        _prevDbmValue = _dbmController.text; // Store previous value
+        _prevDbmValue = _dbmController.text;
         _wattsResult = Conversions.dbmToWatts(dbmValue.toString());
         _dbmWattsSpots = List.generate(11, (index) {
           double x = graphDbm - 5 + index;
@@ -76,11 +90,13 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
         CacheManager.saveCache(CacheManager.dbmKey, dbm);
         CacheManager.addToHistory('dBm to Watts: $dbm $_dbmUnit = $_wattsResult');
       });
+      _animationController.forward(from: 0);
     } catch (e) {
       setState(() {
         _wattsResult = '';
         _dbmWattsSpots = [];
       });
+      _animationController.reverse();
     }
   }
 
@@ -90,21 +106,23 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
         _dbmResult = '';
         _dbmWattsSpots = [];
       });
+      _animationController.reverse();
       return;
     }
     try {
       double wattsValue = double.parse(watts);
-      if (_wattsUnit == 'mW') wattsValue /= 1000; // Convert mW to W
+      if (_wattsUnit == 'mW') wattsValue /= 1000;
       if (wattsValue <= 0 || wattsValue.isNaN || wattsValue.isInfinite) {
         setState(() {
           _dbmResult = '';
           _dbmWattsSpots = [];
         });
+        _animationController.reverse();
         return;
       }
       double graphWatts = min(wattsValue, _maxWattsGraph);
       setState(() {
-        _prevWattsValue = _wattsController.text; // Store previous value
+        _prevWattsValue = _wattsController.text;
         _dbmResult = Conversions.wattsToDbm(wattsValue.toString());
         _dbmWattsSpots = List.generate(11, (index) {
           double y = graphWatts * (0.5 + index * 0.1);
@@ -114,11 +132,13 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
         CacheManager.saveCache(CacheManager.wattsKey, watts);
         CacheManager.addToHistory('Watts to dBm: $watts $_wattsUnit = $_dbmResult');
       });
+      _animationController.forward(from: 0);
     } catch (e) {
       setState(() {
         _dbmResult = '';
         _dbmWattsSpots = [];
       });
+      _animationController.reverse();
     }
   }
 
@@ -235,7 +255,14 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Result: $_wattsResult', style: Theme.of(context).textTheme.bodyLarge),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Result: $_wattsResult',
+                              key: ValueKey(_wattsResult),
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.undo),
@@ -323,7 +350,14 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Result: $_dbmResult', style: Theme.of(context).textTheme.bodyLarge),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Result: $_dbmResult',
+                              key: ValueKey(_dbmResult),
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.undo),
@@ -338,57 +372,79 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
             ),
             const SizedBox(height: 24),
             if (_dbmWattsSpots.isNotEmpty) ...[
-              SizedBox(
-                height: 250,
-                child: LineChart(
-                  LineChartData(
-                    gridData: const FlGridData(show: true),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 50,
-                          interval: max(1.0, (_dbmWattsSpots.last.y - _dbmWattsSpots.first.y) / 3),
-                          getTitlesWidget: (value, meta) => SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            child: Text(
-                              value.toStringAsExponential(1),
-                              style: const TextStyle(fontSize: 10),
+              AnimatedBuilder(
+                animation: _fadeAnimation,
+                builder: (context, child) => FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SizedBox(
+                    height: 250,
+                    child: LineChart(
+                      LineChartData(
+                        gridData: const FlGridData(show: true),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 50,
+                              interval: max(1.0, (_dbmWattsSpots.last.y - _dbmWattsSpots.first.y) / 3),
+                              getTitlesWidget: (value, meta) => SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                child: Text(
+                                  value.toStringAsExponential(1),
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 40,
-                          interval: max(1.0, (_dbmWattsSpots.last.x - _dbmWattsSpots.first.x) / 3),
-                          getTitlesWidget: (value, meta) => SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            child: Text(
-                              value.toStringAsFixed(1),
-                              style: const TextStyle(fontSize: 10),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              interval: max(1.0, (_dbmWattsSpots.last.x - _dbmWattsSpots.first.x) / 3),
+                              getTitlesWidget: (value, meta) => SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                child: Text(
+                                  value.toStringAsFixed(1),
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ),
                             ),
                           ),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
+                        borderData: FlBorderData(show: true),
+                        minX: _dbmWattsSpots.first.x,
+                        maxX: _dbmWattsSpots.last.x,
+                        minY: _dbmWattsSpots.first.y,
+                        maxY: _dbmWattsSpots.last.y,
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: _dbmWattsSpots,
+                            isCurved: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(context).colorScheme.secondary,
+                              ],
+                            ),
+                            barWidth: 2,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                  Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    borderData: FlBorderData(show: true),
-                    minX: _dbmWattsSpots.first.x,
-                    maxX: _dbmWattsSpots.last.x,
-                    minY: _dbmWattsSpots.first.y,
-                    maxY: _dbmWattsSpots.last.y,
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: _dbmWattsSpots,
-                        isCurved: true,
-                        color: Theme.of(context).colorScheme.primary,
-                        barWidth: 2,
-                        dotData: const FlDotData(show: false),
-                      ),
-                    ],
                   ),
                 ),
               ),

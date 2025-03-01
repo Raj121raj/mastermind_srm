@@ -11,7 +11,7 @@ class FreqWavelengthScreen extends StatefulWidget {
   _FreqWavelengthScreenState createState() => _FreqWavelengthScreenState();
 }
 
-class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
+class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with SingleTickerProviderStateMixin {
   String _wavelengthResult = '';
   String _freqResult = '';
   final TextEditingController _freqController = TextEditingController();
@@ -19,15 +19,27 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
   List<FlSpot> _freqWavelengthSpots = [];
   static const double _maxFreqGraph = 1e12;
   static const double _maxWavelengthGraph = 1000.0;
-  String _freqUnit = 'Hz'; // Default unit
-  String _wavelengthUnit = 'm'; // Default unit
-  String? _prevFreqValue; // Store previous Frequency input
-  String? _prevWavelengthValue; // Store previous Wavelength input
+  String _freqUnit = 'Hz';
+  String _wavelengthUnit = 'm';
+  String? _prevFreqValue;
+  String? _prevWavelengthValue;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _loadCache();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _freqController.dispose();
+    _wavelengthController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCache() async {
@@ -53,6 +65,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
         _wavelengthResult = '';
         _freqWavelengthSpots = [];
       });
+      _animationController.reverse();
       return;
     }
     try {
@@ -66,11 +79,12 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
           _wavelengthResult = '';
           _freqWavelengthSpots = [];
         });
+        _animationController.reverse();
         return;
       }
       double graphFreq = min(freqValue, _maxFreqGraph);
       setState(() {
-        _prevFreqValue = _freqController.text; // Store previous value
+        _prevFreqValue = _freqController.text;
         _wavelengthResult = Conversions.freqToWavelength(freqValue.toString());
         _freqWavelengthSpots = List.generate(11, (index) {
           double x = graphFreq * (0.5 + index * 0.1);
@@ -80,11 +94,13 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
         CacheManager.saveCache(CacheManager.freqKey, freq);
         CacheManager.addToHistory('Freq to Wavelength: $freq $_freqUnit = $_wavelengthResult');
       });
+      _animationController.forward(from: 0);
     } catch (e) {
       setState(() {
         _wavelengthResult = '';
         _freqWavelengthSpots = [];
       });
+      _animationController.reverse();
     }
   }
 
@@ -94,6 +110,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
         _freqResult = '';
         _freqWavelengthSpots = [];
       });
+      _animationController.reverse();
       return;
     }
     try {
@@ -105,11 +122,12 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
           _freqResult = '';
           _freqWavelengthSpots = [];
         });
+        _animationController.reverse();
         return;
       }
       double graphWavelength = min(wavelengthValue, _maxWavelengthGraph);
       setState(() {
-        _prevWavelengthValue = _wavelengthController.text; // Store previous value
+        _prevWavelengthValue = _wavelengthController.text;
         _freqResult = Conversions.wavelengthToFreq(wavelengthValue.toString());
         _freqWavelengthSpots = List.generate(11, (index) {
           double y = graphWavelength * (0.5 + index * 0.1);
@@ -119,11 +137,13 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
         CacheManager.saveCache(CacheManager.wavelengthKey, wavelength);
         CacheManager.addToHistory('Wavelength to Freq: $wavelength $_wavelengthUnit = $_freqResult');
       });
+      _animationController.forward(from: 0);
     } catch (e) {
       setState(() {
         _freqResult = '';
         _freqWavelengthSpots = [];
       });
+      _animationController.reverse();
     }
   }
 
@@ -263,7 +283,14 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Result: $_wavelengthResult', style: Theme.of(context).textTheme.bodyLarge),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Result: $_wavelengthResult',
+                              key: ValueKey(_wavelengthResult),
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.undo),
@@ -351,7 +378,14 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('Result: $_freqResult', style: Theme.of(context).textTheme.bodyLarge),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Result: $_freqResult',
+                              key: ValueKey(_freqResult),
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.undo),
@@ -366,57 +400,79 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
             ),
             const SizedBox(height: 24),
             if (_freqWavelengthSpots.isNotEmpty) ...[
-              SizedBox(
-                height: 250,
-                child: LineChart(
-                  LineChartData(
-                    gridData: const FlGridData(show: true),
-                    titlesData: FlTitlesData(
-                      leftTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 50,
-                          interval: max(1.0, (_freqWavelengthSpots.last.y - _freqWavelengthSpots.first.y) / 3),
-                          getTitlesWidget: (value, meta) => SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            child: Text(
-                              value.toStringAsExponential(1),
-                              style: const TextStyle(fontSize: 10),
+              AnimatedBuilder(
+                animation: _fadeAnimation,
+                builder: (context, child) => FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SizedBox(
+                    height: 250,
+                    child: LineChart(
+                      LineChartData(
+                        gridData: const FlGridData(show: true),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 50,
+                              interval: max(1.0, (_freqWavelengthSpots.last.y - _freqWavelengthSpots.first.y) / 3),
+                              getTitlesWidget: (value, meta) => SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                child: Text(
+                                  value.toStringAsExponential(1),
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 40,
-                          interval: max(1.0, (_freqWavelengthSpots.last.x - _freqWavelengthSpots.first.x) / 3),
-                          getTitlesWidget: (value, meta) => SideTitleWidget(
-                            axisSide: meta.axisSide,
-                            child: Text(
-                              '${value.toStringAsFixed(0)} MHz',
-                              style: const TextStyle(fontSize: 10),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              interval: max(1.0, (_freqWavelengthSpots.last.x - _freqWavelengthSpots.first.x) / 3),
+                              getTitlesWidget: (value, meta) => SideTitleWidget(
+                                axisSide: meta.axisSide,
+                                child: Text(
+                                  '${value.toStringAsFixed(0)} MHz',
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ),
                             ),
                           ),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
+                        borderData: FlBorderData(show: true),
+                        minX: _freqWavelengthSpots.first.x,
+                        maxX: _freqWavelengthSpots.last.x,
+                        minY: _freqWavelengthSpots.first.y,
+                        maxY: _freqWavelengthSpots.last.y,
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: _freqWavelengthSpots,
+                            isCurved: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(context).colorScheme.secondary,
+                              ],
+                            ),
+                            barWidth: 2,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                  Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     ),
-                    borderData: FlBorderData(show: true),
-                    minX: _freqWavelengthSpots.first.x,
-                    maxX: _freqWavelengthSpots.last.x,
-                    minY: _freqWavelengthSpots.first.y,
-                    maxY: _freqWavelengthSpots.last.y,
-                    lineBarsData: [
-                      LineChartBarData(
-                        spots: _freqWavelengthSpots,
-                        isCurved: true,
-                        color: Theme.of(context).colorScheme.primary,
-                        barWidth: 2,
-                        dotData: const FlDotData(show: false),
-                      ),
-                    ],
                   ),
                 ),
               ),
