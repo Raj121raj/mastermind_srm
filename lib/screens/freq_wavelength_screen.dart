@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../utils/conversions.dart';
+import '../utils/cache_manager.dart';
 
 class FreqWavelengthScreen extends StatefulWidget {
   const FreqWavelengthScreen({super.key});
@@ -16,8 +17,33 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
   final TextEditingController _freqController = TextEditingController();
   final TextEditingController _wavelengthController = TextEditingController();
   List<FlSpot> _freqWavelengthSpots = [];
-  static const double _maxFreqGraph = 1e12; // Graph cap at 1 THz
-  static const double _maxWavelengthGraph = 1000.0; // Graph cap at 1000 m
+  static const double _maxFreqGraph = 1e12;
+  static const double _maxWavelengthGraph = 1000.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCache();
+  }
+
+  Future<void> _loadCache() async {
+    final freqCached = await CacheManager.loadCache(CacheManager.freqKey);
+    final wavelengthCached = await CacheManager.loadCache(CacheManager.wavelengthKey);
+    if (freqCached != null) {
+      setState(() {
+        _freqController.text = freqCached;
+        _wavelengthResult = Conversions.freqToWavelength(freqCached);
+        _updateGraphFromFreq(freqCached);
+      });
+    }
+    if (wavelengthCached != null) {
+      setState(() {
+        _wavelengthController.text = wavelengthCached;
+        _freqResult = Conversions.wavelengthToFreq(wavelengthCached);
+        _updateGraphFromWavelength(wavelengthCached);
+      });
+    }
+  }
 
   void _updateGraphFromFreq(String freq) {
     if (freq.isEmpty) {
@@ -31,12 +57,14 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
         return;
       }
       double graphFreq = min(freqValue, _maxFreqGraph);
-      _freqWavelengthSpots = List.generate(11, (index) {
-        double x = graphFreq * (0.5 + index * 0.1);
-        double y = 299792458 / x;
-        return FlSpot(x / 1e6, y);
+      setState(() {
+        _freqWavelengthSpots = List.generate(11, (index) {
+          double x = graphFreq * (0.5 + index * 0.1);
+          double y = 299792458 / x;
+          return FlSpot(x / 1e6, y);
+        });
+        CacheManager.saveCache(CacheManager.freqKey, freq);
       });
-      setState(() {});
     } catch (e) {
       setState(() => _freqWavelengthSpots = []);
     }
@@ -54,12 +82,14 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
         return;
       }
       double graphWavelength = min(wavelengthValue, _maxWavelengthGraph);
-      _freqWavelengthSpots = List.generate(11, (index) {
-        double y = graphWavelength * (0.5 + index * 0.1);
-        double x = 299792458 / y;
-        return FlSpot(x / 1e6, y);
+      setState(() {
+        _freqWavelengthSpots = List.generate(11, (index) {
+          double y = graphWavelength * (0.5 + index * 0.1);
+          double x = 299792458 / y;
+          return FlSpot(x / 1e6, y);
+        });
+        CacheManager.saveCache(CacheManager.wavelengthKey, wavelength);
       });
-      setState(() {});
     } catch (e) {
       setState(() => _freqWavelengthSpots = []);
     }
@@ -87,11 +117,6 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                     Text(
                       'Frequency to Wavelength',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Translates frequency (Hz) to wavelength (m) using the speed of light (c ≈ 299,792,458 m/s). Higher frequencies mean shorter wavelengths.',
-                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -130,11 +155,6 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                       'Wavelength to Frequency',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Converts wavelength (m) to frequency (Hz) with the speed of light as the bridge. Longer wavelengths correspond to lower frequencies.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _wavelengthController,
@@ -160,7 +180,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (_freqWavelengthSpots.isNotEmpty) ...[
+            if (_freqWavelengthSpots.isNotEmpty)
               SizedBox(
                 height: 250,
                 child: LineChart(
@@ -215,23 +235,6 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Behold: The graph dances only up to 1 THz or 1000 m. Beyond these ethereal bounds, it sketches a humble tale of waves in serene restraint.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                        fontStyle: FontStyle.italic,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
           ],
         ),
       ),

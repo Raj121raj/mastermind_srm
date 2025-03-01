@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../utils/conversions.dart';
+import '../utils/cache_manager.dart';
 
 class RectPolarScreen extends StatefulWidget {
   const RectPolarScreen({super.key});
@@ -18,7 +19,36 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
   final TextEditingController _magController = TextEditingController();
   final TextEditingController _angleController = TextEditingController();
   List<FlSpot> _rectSpots = [];
-  static const double _maxValueGraph = 1000.0; // Graph cap at 1000
+  static const double _maxValueGraph = 1000.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCache();
+  }
+
+  Future<void> _loadCache() async {
+    final realCached = await CacheManager.loadCache(CacheManager.realKey);
+    final imagCached = await CacheManager.loadCache(CacheManager.imagKey);
+    final magCached = await CacheManager.loadCache(CacheManager.magKey);
+    final angleCached = await CacheManager.loadCache(CacheManager.angleKey);
+    if (realCached != null && imagCached != null) {
+      setState(() {
+        _realController.text = realCached;
+        _imagController.text = imagCached;
+        _polarResult = Conversions.rectToPolar(realCached, imagCached);
+        _updateGraphFromRect(realCached, imagCached);
+      });
+    }
+    if (magCached != null && angleCached != null) {
+      setState(() {
+        _magController.text = magCached;
+        _angleController.text = angleCached;
+        _rectResult = Conversions.polarToRect(magCached, angleCached);
+        _updateGraphFromPolar(magCached, angleCached);
+      });
+    }
+  }
 
   void _updateGraphFromRect(String real, String imag) {
     if (real.isEmpty || imag.isEmpty) {
@@ -34,8 +64,11 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
       }
       double graphX = x.abs() > _maxValueGraph ? (_maxValueGraph * x.sign) : x;
       double graphY = y.abs() > _maxValueGraph ? (_maxValueGraph * y.sign) : y;
-      _rectSpots = [FlSpot(graphX, graphY)];
-      setState(() {});
+      setState(() {
+        _rectSpots = [FlSpot(graphX, graphY)];
+        CacheManager.saveCache(CacheManager.realKey, real);
+        CacheManager.saveCache(CacheManager.imagKey, imag);
+      });
     } catch (e) {
       setState(() => _rectSpots = []);
     }
@@ -57,8 +90,11 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
       double thetaRad = thetaDeg * pi / 180;
       double x = graphR * cos(thetaRad);
       double y = graphR * sin(thetaRad);
-      _rectSpots = [FlSpot(x, y)];
-      setState(() {});
+      setState(() {
+        _rectSpots = [FlSpot(x, y)];
+        CacheManager.saveCache(CacheManager.magKey, magnitude);
+        CacheManager.saveCache(CacheManager.angleKey, angle);
+      });
     } catch (e) {
       setState(() => _rectSpots = []);
     }
@@ -86,11 +122,6 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                     Text(
                       'Rectangular to Polar',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Shifts from rectangular (real, imaginary) to polar (magnitude, angle) form. It unveils the length and direction of a complex number’s journey.',
-                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -149,11 +180,6 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                       'Polar to Rectangular',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Maps polar (magnitude, angle) to rectangular (real, imaginary) coordinates. It traces the path of magnitude and angle back to the Cartesian plane.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _magController,
@@ -199,7 +225,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (_rectSpots.isNotEmpty) ...[
+            if (_rectSpots.isNotEmpty)
               SizedBox(
                 height: 250,
                 child: ScatterChart(
@@ -255,23 +281,6 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Caution: The plot pauses at a magnitude of 1000. Venture beyond, and it offers a modest echo of coordinates in tranquil bounds.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                        fontStyle: FontStyle.italic,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
           ],
         ),
       ),

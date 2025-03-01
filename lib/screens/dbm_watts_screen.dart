@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../utils/conversions.dart';
+import '../utils/cache_manager.dart';
 
 class DbmWattsScreen extends StatefulWidget {
   const DbmWattsScreen({super.key});
@@ -16,8 +17,33 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
   final TextEditingController _dbmController = TextEditingController();
   final TextEditingController _wattsController = TextEditingController();
   List<FlSpot> _dbmWattsSpots = [];
-  static const double _maxDbmGraph = 100.0; // Graph cap at 100 dBm
-  static const double _maxWattsGraph = 10000.0; // Graph cap at 10 kW
+  static const double _maxDbmGraph = 100.0;
+  static const double _maxWattsGraph = 10000.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCache();
+  }
+
+  Future<void> _loadCache() async {
+    final dbmCached = await CacheManager.loadCache(CacheManager.dbmKey);
+    final wattsCached = await CacheManager.loadCache(CacheManager.wattsKey);
+    if (dbmCached != null) {
+      setState(() {
+        _dbmController.text = dbmCached;
+        _wattsResult = Conversions.dbmToWatts(dbmCached);
+        _updateGraphFromDbm(dbmCached);
+      });
+    }
+    if (wattsCached != null) {
+      setState(() {
+        _wattsController.text = wattsCached;
+        _dbmResult = Conversions.wattsToDbm(wattsCached);
+        _updateGraphFromWatts(wattsCached);
+      });
+    }
+  }
 
   void _updateGraphFromDbm(String dbm) {
     if (dbm.isEmpty) {
@@ -31,12 +57,14 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
         return;
       }
       double graphDbm = min(dbmValue, _maxDbmGraph);
-      _dbmWattsSpots = List.generate(11, (index) {
-        double x = graphDbm - 5 + index;
-        double y = pow(10, (x - 30) / 10).toDouble();
-        return FlSpot(x, y);
+      setState(() {
+        _dbmWattsSpots = List.generate(11, (index) {
+          double x = graphDbm - 5 + index;
+          double y = pow(10, (x - 30) / 10).toDouble();
+          return FlSpot(x, y);
+        });
+        CacheManager.saveCache(CacheManager.dbmKey, dbm);
       });
-      setState(() {});
     } catch (e) {
       setState(() => _dbmWattsSpots = []);
     }
@@ -54,12 +82,14 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
         return;
       }
       double graphWatts = min(wattsValue, _maxWattsGraph);
-      _dbmWattsSpots = List.generate(11, (index) {
-        double y = graphWatts * (0.5 + index * 0.1);
-        double x = 10 * log(y * 1000) / ln10;
-        return FlSpot(x, y);
+      setState(() {
+        _dbmWattsSpots = List.generate(11, (index) {
+          double y = graphWatts * (0.5 + index * 0.1);
+          double x = 10 * log(y * 1000) / ln10;
+          return FlSpot(x, y);
+        });
+        CacheManager.saveCache(CacheManager.wattsKey, watts);
       });
-      setState(() {});
     } catch (e) {
       setState(() => _dbmWattsSpots = []);
     }
@@ -87,11 +117,6 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                     Text(
                       'dBm to Watts',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Converts power from decibel-milliwatts (dBm) to watts (W). This logarithmic scale measures power relative to 1 milliwatt, where 0 dBm equals 0.001 W.',
-                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -130,11 +155,6 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                       'Watts to dBm',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Transforms power in watts (W) to decibel-milliwatts (dBm). It expresses power on a logarithmic scale, making large ranges easier to compare.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _wattsController,
@@ -160,7 +180,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            if (_dbmWattsSpots.isNotEmpty) ...[
+            if (_dbmWattsSpots.isNotEmpty)
               SizedBox(
                 height: 250,
                 child: LineChart(
@@ -215,23 +235,6 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Note: The graph whispers its limits at 100 dBm or 10,000 W. Beyond these horizons, it paints a gentle, generic curve of power’s dance.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.error,
-                        fontStyle: FontStyle.italic,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
           ],
         ),
       ),
