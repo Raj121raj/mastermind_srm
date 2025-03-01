@@ -19,6 +19,8 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
   final TextEditingController _magController = TextEditingController();
   final TextEditingController _angleController = TextEditingController();
   List<FlSpot> _rectSpots = [];
+  List<Map<String, String>> _rectPoints = []; // Store (x, y) pairs
+  List<Map<String, String>> _polarPoints = []; // Store (r, θ) pairs
   static const double _maxValueGraph = 1000.0;
   String? _prevRealValue;
   String? _prevImagValue;
@@ -55,7 +57,8 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
         _realController.text = realCached;
         _imagController.text = imagCached;
         _polarResult = Conversions.rectToPolar(realCached, imagCached);
-        _updateGraphFromRect(realCached, imagCached);
+        _rectPoints.add({'real': realCached, 'imag': imagCached});
+        _updateGraphFromRect();
       });
     }
     if (magCached != null && angleCached != null) {
@@ -63,73 +66,110 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
         _magController.text = magCached;
         _angleController.text = angleCached;
         _rectResult = Conversions.polarToRect(magCached, angleCached);
-        _updateGraphFromPolar(magCached, angleCached);
+        _polarPoints.add({'mag': magCached, 'angle': angleCached});
+        _updateGraphFromPolar();
       });
     }
   }
 
-  void _updateGraphFromRect(String real, String imag) {
-    if (real.isEmpty || imag.isEmpty) {
-      setState(() => _rectSpots = []);
-      _animationController.reverse();
-      return;
-    }
-    try {
-      double x = double.parse(real);
-      double y = double.parse(imag);
-      if (x.isNaN || y.isNaN || x.isInfinite || y.isInfinite) {
-        setState(() => _rectSpots = []);
-        _animationController.reverse();
-        return;
+  void _addRectPoint() {
+    final real = _realController.text;
+    final imag = _imagController.text;
+    if (real.isNotEmpty && imag.isNotEmpty) {
+      try {
+        double.parse(real);
+        double.parse(imag);
+        setState(() {
+          _prevRealValue = real;
+          _prevImagValue = imag;
+          _rectPoints.add({'real': real, 'imag': imag});
+          _polarPoints.clear(); // Clear opposite list
+          _polarResult = Conversions.rectToPolar(real, imag);
+          _magController.clear();
+          _angleController.clear();
+          _rectResult = '';
+          _updateGraphFromRect();
+        });
+      } catch (e) {
+        // Ignore invalid inputs
       }
-      double graphX = x.abs() > _maxValueGraph ? (_maxValueGraph * x.sign) : x;
-      double graphY = y.abs() > _maxValueGraph ? (_maxValueGraph * y.sign) : y;
-      setState(() {
-        _prevRealValue = real;
-        _prevImagValue = imag;
-        _rectSpots = [FlSpot(graphX, graphY)];
-        CacheManager.saveCache(CacheManager.realKey, real);
-        CacheManager.saveCache(CacheManager.imagKey, imag);
-        CacheManager.addToHistory('Rect to Polar: ($real, $imag) = $_polarResult');
-      });
-      _animationController.forward(from: 0);
-    } catch (e) {
-      setState(() => _rectSpots = []);
-      _animationController.reverse();
     }
   }
 
-  void _updateGraphFromPolar(String magnitude, String angle) {
-    if (magnitude.isEmpty || angle.isEmpty) {
-      setState(() => _rectSpots = []);
-      _animationController.reverse();
-      return;
-    }
-    try {
-      double r = double.parse(magnitude);
-      double thetaDeg = double.parse(angle);
-      if (r < 0 || r.isNaN || thetaDeg.isNaN || r.isInfinite || thetaDeg.isInfinite) {
-        setState(() => _rectSpots = []);
-        _animationController.reverse();
-        return;
+  void _addPolarPoint() {
+    final mag = _magController.text;
+    final angle = _angleController.text;
+    if (mag.isNotEmpty && angle.isNotEmpty) {
+      try {
+        double.parse(mag);
+        double.parse(angle);
+        setState(() {
+          _prevMagValue = mag;
+          _prevAngleValue = angle;
+          _polarPoints.add({'mag': mag, 'angle': angle});
+          _rectPoints.clear(); // Clear opposite list
+          _rectResult = Conversions.polarToRect(mag, angle);
+          _realController.clear();
+          _imagController.clear();
+          _polarResult = '';
+          _updateGraphFromPolar();
+        });
+      } catch (e) {
+        // Ignore invalid inputs
       }
-      double graphR = min(r, _maxValueGraph);
-      double thetaRad = thetaDeg * pi / 180;
-      double x = graphR * cos(thetaRad);
-      double y = graphR * sin(thetaRad);
-      setState(() {
-        _prevMagValue = magnitude;
-        _prevAngleValue = angle;
-        _rectSpots = [FlSpot(x, y)];
-        CacheManager.saveCache(CacheManager.magKey, magnitude);
-        CacheManager.saveCache(CacheManager.angleKey, angle);
-        CacheManager.addToHistory('Polar to Rect: ($magnitude, $angle°) = $_rectResult');
-      });
-      _animationController.forward(from: 0);
-    } catch (e) {
-      setState(() => _rectSpots = []);
-      _animationController.reverse();
     }
+  }
+
+  void _updateGraphFromRect() {
+    setState(() {
+      _rectSpots = _rectPoints.map((point) {
+        double x = double.parse(point['real']!);
+        double y = double.parse(point['imag']!);
+        double graphX = x.abs() > _maxValueGraph ? (_maxValueGraph * x.sign) : x;
+        double graphY = y.abs() > _maxValueGraph ? (_maxValueGraph * y.sign) : y;
+        return FlSpot(graphX, graphY);
+      }).toList();
+    });
+    _animationController.forward(from: 0);
+  }
+
+  void _updateGraphFromPolar() {
+    setState(() {
+      _rectSpots = _polarPoints.map((point) {
+        double r = double.parse(point['mag']!);
+        double thetaDeg = double.parse(point['angle']!);
+        double graphR = min(r, _maxValueGraph);
+        double thetaRad = thetaDeg * pi / 180;
+        double x = graphR * cos(thetaRad);
+        double y = graphR * sin(thetaRad);
+        return FlSpot(x, y);
+      }).toList();
+    });
+    _animationController.forward(from: 0);
+  }
+
+  void _deleteRectPoint(int index) {
+    setState(() {
+      _rectPoints.removeAt(index);
+      _polarResult = '';
+      _rectResult = '';
+      if (_rectPoints.isNotEmpty) {
+        _polarResult = Conversions.rectToPolar(_rectPoints.last['real']!, _rectPoints.last['imag']!);
+      }
+      _updateGraphFromRect();
+    });
+  }
+
+  void _deletePolarPoint(int index) {
+    setState(() {
+      _polarPoints.removeAt(index);
+      _polarResult = '';
+      _rectResult = '';
+      if (_polarPoints.isNotEmpty) {
+        _rectResult = Conversions.polarToRect(_polarPoints.last['mag']!, _polarPoints.last['angle']!);
+      }
+      _updateGraphFromPolar();
+    });
   }
 
   void _undoRect() {
@@ -141,7 +181,9 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
         _angleController.clear();
         _rectResult = '';
         _polarResult = Conversions.rectToPolar(_prevRealValue!, _prevImagValue!);
-        _updateGraphFromRect(_prevRealValue!, _prevImagValue!);
+        _rectPoints.add({'real': _prevRealValue!, 'imag': _prevImagValue!});
+        _polarPoints.clear();
+        _updateGraphFromRect();
       });
     }
   }
@@ -155,7 +197,9 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
         _imagController.clear();
         _polarResult = '';
         _rectResult = Conversions.polarToRect(_prevMagValue!, _prevAngleValue!);
-        _updateGraphFromPolar(_prevMagValue!, _prevAngleValue!);
+        _polarPoints.add({'mag': _prevMagValue!, 'angle': _prevAngleValue!});
+        _rectPoints.clear();
+        _updateGraphFromPolar();
       });
     }
   }
@@ -214,7 +258,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Shifts from rectangular (real, imaginary) to polar (magnitude, angle) form. It unveils the length and direction of a complex number’s journey.',
+                      'Shifts from rectangular (real, imaginary) to polar (magnitude, angle) form. Add multiple points to plot.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 12),
@@ -236,20 +280,13 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                               _angleController.clear();
                               _polarResult = '';
                               _rectResult = '';
+                              _rectPoints.clear();
+                              _polarPoints.clear();
                               _rectSpots = [];
                             });
                           },
                         ),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _magController.clear();
-                          _angleController.clear();
-                          _rectResult = '';
-                          _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
-                          _updateGraphFromRect(_realController.text, _imagController.text);
-                        });
-                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -260,31 +297,31 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _realController.clear();
-                              _imagController.clear();
-                              _magController.clear();
-                              _angleController.clear();
-                              _polarResult = '';
-                              _rectResult = '';
-                              _rectSpots = [];
-                            });
-                          },
-                        ),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _magController.clear();
-                          _angleController.clear();
-                          _rectResult = '';
-                          _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
-                          _updateGraphFromRect(_realController.text, _imagController.text);
-                        });
-                      },
                     ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _addRectPoint,
+                      child: const Text('Add Point'),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_rectPoints.isNotEmpty) ...[
+                      Text(
+                        'Points:',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      ..._rectPoints.asMap().entries.map((entry) {
+                        int index = entry.key;
+                        Map<String, String> point = entry.value;
+                        return ListTile(
+                          title: Text('(${point['real']}, ${point['imag']})'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () => _deleteRectPoint(index),
+                          ),
+                        );
+                      }),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -324,7 +361,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Maps polar (magnitude, angle) to rectangular (real, imaginary) coordinates. It traces the path of magnitude and angle back to the Cartesian plane.',
+                      'Maps polar (magnitude, angle) to rectangular (real, imaginary) coordinates. Add multiple points to plot.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 12),
@@ -346,20 +383,13 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                               _imagController.clear();
                               _polarResult = '';
                               _rectResult = '';
+                              _rectPoints.clear();
+                              _polarPoints.clear();
                               _rectSpots = [];
                             });
                           },
                         ),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _realController.clear();
-                          _imagController.clear();
-                          _polarResult = '';
-                          _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
-                          _updateGraphFromPolar(_magController.text, _angleController.text);
-                        });
-                      },
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -370,31 +400,31 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _magController.clear();
-                              _angleController.clear();
-                              _realController.clear();
-                              _imagController.clear();
-                              _polarResult = '';
-                              _rectResult = '';
-                              _rectSpots = [];
-                            });
-                          },
-                        ),
                       ),
-                      onChanged: (value) {
-                        setState(() {
-                          _realController.clear();
-                          _imagController.clear();
-                          _polarResult = '';
-                          _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
-                          _updateGraphFromPolar(_magController.text, _angleController.text);
-                        });
-                      },
                     ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _addPolarPoint,
+                      child: const Text('Add Point'),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_polarPoints.isNotEmpty) ...[
+                      Text(
+                        'Points:',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      ..._polarPoints.asMap().entries.map((entry) {
+                        int index = entry.key;
+                        Map<String, String> point = entry.value;
+                        return ListTile(
+                          title: Text('(${point['mag']}, ${point['angle']}°)'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: () => _deletePolarPoint(index),
+                          ),
+                        );
+                      }),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -473,10 +503,10 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
                         borderData: FlBorderData(show: true),
-                        minX: _rectSpots.first.x - 1,
-                        maxX: _rectSpots.last.x + 1,
-                        minY: _rectSpots.first.y - 1,
-                        maxY: _rectSpots.last.y + 1,
+                        minX: _rectSpots.map((spot) => spot.x).reduce(min) - 1,
+                        maxX: _rectSpots.map((spot) => spot.x).reduce(max) + 1,
+                        minY: _rectSpots.map((spot) => spot.y).reduce(min) - 1,
+                        maxY: _rectSpots.map((spot) => spot.y).reduce(max) + 1,
                       ),
                     ),
                   ),
@@ -490,7 +520,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Caution: The plot pauses at a magnitude of 1000. Venture beyond, and it offers a modest echo of coordinates in tranquil bounds.',
+                  'Caution: The plot caps at a magnitude of 1000. Points beyond are scaled down.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.error,
                         fontStyle: FontStyle.italic,
