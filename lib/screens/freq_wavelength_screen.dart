@@ -1,4 +1,6 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../utils/conversions.dart';
 
 class FreqWavelengthScreen extends StatefulWidget {
@@ -13,6 +15,55 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
   String _freqResult = '';
   final TextEditingController _freqController = TextEditingController();
   final TextEditingController _wavelengthController = TextEditingController();
+  List<FlSpot> _freqWavelengthSpots = [];
+  static const double _maxFreqGraph = 1e12; // Graph cap at 1 THz
+  static const double _maxWavelengthGraph = 1000.0; // Graph cap at 1000 m
+
+  void _updateGraphFromFreq(String freq) {
+    if (freq.isEmpty) {
+      setState(() => _freqWavelengthSpots = []);
+      return;
+    }
+    try {
+      double freqValue = double.parse(freq);
+      if (freqValue <= 0 || freqValue.isNaN || freqValue.isInfinite) {
+        setState(() => _freqWavelengthSpots = []);
+        return;
+      }
+      double graphFreq = min(freqValue, _maxFreqGraph);
+      _freqWavelengthSpots = List.generate(11, (index) {
+        double x = graphFreq * (0.5 + index * 0.1);
+        double y = 299792458 / x;
+        return FlSpot(x / 1e6, y);
+      });
+      setState(() {});
+    } catch (e) {
+      setState(() => _freqWavelengthSpots = []);
+    }
+  }
+
+  void _updateGraphFromWavelength(String wavelength) {
+    if (wavelength.isEmpty) {
+      setState(() => _freqWavelengthSpots = []);
+      return;
+    }
+    try {
+      double wavelengthValue = double.parse(wavelength);
+      if (wavelengthValue <= 0 || wavelengthValue.isNaN || wavelengthValue.isInfinite) {
+        setState(() => _freqWavelengthSpots = []);
+        return;
+      }
+      double graphWavelength = min(wavelengthValue, _maxWavelengthGraph);
+      _freqWavelengthSpots = List.generate(11, (index) {
+        double y = graphWavelength * (0.5 + index * 0.1);
+        double x = 299792458 / y;
+        return FlSpot(x / 1e6, y);
+      });
+      setState(() {});
+    } catch (e) {
+      setState(() => _freqWavelengthSpots = []);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +88,11 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                       'Frequency to Wavelength',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Translates frequency (Hz) to wavelength (m) using the speed of light (c ≈ 299,792,458 m/s). Higher frequencies mean shorter wavelengths.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _freqController,
@@ -51,6 +107,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                         setState(() {
                           _wavelengthResult = Conversions.freqToWavelength(value);
                           _wavelengthController.clear();
+                          _updateGraphFromFreq(value);
                         });
                       },
                     ),
@@ -73,6 +130,11 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                       'Wavelength to Frequency',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Converts wavelength (m) to frequency (Hz) with the speed of light as the bridge. Longer wavelengths correspond to lower frequencies.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _wavelengthController,
@@ -87,6 +149,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                         setState(() {
                           _freqResult = Conversions.wavelengthToFreq(value);
                           _freqController.clear();
+                          _updateGraphFromWavelength(value);
                         });
                       },
                     ),
@@ -96,6 +159,79 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+            if (_freqWavelengthSpots.isNotEmpty) ...[
+              SizedBox(
+                height: 250,
+                child: LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(show: true),
+                    titlesData: FlTitlesData(
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 50,
+                          interval: max(1.0, (_freqWavelengthSpots.last.y - _freqWavelengthSpots.first.y) / 3),
+                          getTitlesWidget: (value, meta) => SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            child: Text(
+                              value.toStringAsExponential(1),
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ),
+                      ),
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 40,
+                          interval: max(1.0, (_freqWavelengthSpots.last.x - _freqWavelengthSpots.first.x) / 3),
+                          getTitlesWidget: (value, meta) => SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            child: Text(
+                              '${value.toStringAsFixed(0)} MHz',
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ),
+                      ),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: true),
+                    minX: _freqWavelengthSpots.first.x,
+                    maxX: _freqWavelengthSpots.last.x,
+                    minY: _freqWavelengthSpots.first.y,
+                    maxY: _freqWavelengthSpots.last.y,
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: _freqWavelengthSpots,
+                        isCurved: true,
+                        color: Theme.of(context).colorScheme.primary,
+                        barWidth: 2,
+                        dotData: const FlDotData(show: false),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Behold: The graph dances only up to 1 THz or 1000 m. Beyond these ethereal bounds, it sketches a humble tale of waves in serene restraint.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                        fontStyle: FontStyle.italic,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ],
         ),
       ),
