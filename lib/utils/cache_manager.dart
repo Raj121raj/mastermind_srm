@@ -9,6 +9,7 @@ class CacheManager {
   static const String imagKey = 'imag_input';
   static const String magKey = 'mag_input';
   static const String angleKey = 'angle_input';
+  static const String historyKey = 'conversion_history';
 
   static Future<void> saveCache(String key, String value) async {
     final prefs = await SharedPreferences.getInstance();
@@ -18,5 +19,18 @@ class CacheManager {
   static Future<String?> loadCache(String key) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(key);
+  }
+
+  static Future<void> addToHistory(String entry) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> history = prefs.getStringList(historyKey) ?? [];
+    history.insert(0, entry);
+    if (history.length > 10) history = history.sublist(0, 10); // Limit to 10
+    await prefs.setStringList(historyKey, history);
+  }
+
+  static Future<List<String>> getHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(historyKey) ?? [];
   }
 }

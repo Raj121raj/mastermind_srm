@@ -19,6 +19,8 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
   List<FlSpot> _dbmWattsSpots = [];
   static const double _maxDbmGraph = 100.0;
   static const double _maxWattsGraph = 10000.0;
+  String _dbmUnit = 'dBm'; // Fixed unit, no dropdown needed
+  String _wattsUnit = 'W'; // Default unit
 
   @override
   void initState() {
@@ -32,66 +34,87 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
     if (dbmCached != null) {
       setState(() {
         _dbmController.text = dbmCached;
-        _wattsResult = Conversions.dbmToWatts(dbmCached);
-        _updateGraphFromDbm(dbmCached);
+        _updateFromDbm(dbmCached);
       });
     }
     if (wattsCached != null) {
       setState(() {
         _wattsController.text = wattsCached;
-        _dbmResult = Conversions.wattsToDbm(wattsCached);
-        _updateGraphFromWatts(wattsCached);
+        _updateFromWatts(wattsCached);
       });
     }
   }
 
-  void _updateGraphFromDbm(String dbm) {
+  void _updateFromDbm(String dbm) {
     if (dbm.isEmpty) {
-      setState(() => _dbmWattsSpots = []);
+      setState(() {
+        _wattsResult = '';
+        _dbmWattsSpots = [];
+      });
       return;
     }
     try {
-      double dbmValue = double.parse(dbm);
+      double dbmValue = double.parse(dbm); // Only dBm unit allowed
       if (dbmValue.isNaN || dbmValue.isInfinite) {
-        setState(() => _dbmWattsSpots = []);
+        setState(() {
+          _wattsResult = '';
+          _dbmWattsSpots = [];
+        });
         return;
       }
       double graphDbm = min(dbmValue, _maxDbmGraph);
       setState(() {
+        _wattsResult = Conversions.dbmToWatts(dbmValue.toString());
         _dbmWattsSpots = List.generate(11, (index) {
           double x = graphDbm - 5 + index;
           double y = pow(10, (x - 30) / 10).toDouble();
           return FlSpot(x, y);
         });
         CacheManager.saveCache(CacheManager.dbmKey, dbm);
+        CacheManager.addToHistory('dBm to Watts: $dbm $_dbmUnit = $_wattsResult');
       });
     } catch (e) {
-      setState(() => _dbmWattsSpots = []);
+      setState(() {
+        _wattsResult = '';
+        _dbmWattsSpots = [];
+      });
     }
   }
 
-  void _updateGraphFromWatts(String watts) {
+  void _updateFromWatts(String watts) {
     if (watts.isEmpty) {
-      setState(() => _dbmWattsSpots = []);
+      setState(() {
+        _dbmResult = '';
+        _dbmWattsSpots = [];
+      });
       return;
     }
     try {
       double wattsValue = double.parse(watts);
+      if (_wattsUnit == 'mW') wattsValue /= 1000; // Convert mW to W
       if (wattsValue <= 0 || wattsValue.isNaN || wattsValue.isInfinite) {
-        setState(() => _dbmWattsSpots = []);
+        setState(() {
+          _dbmResult = '';
+          _dbmWattsSpots = [];
+        });
         return;
       }
       double graphWatts = min(wattsValue, _maxWattsGraph);
       setState(() {
+        _dbmResult = Conversions.wattsToDbm(wattsValue.toString());
         _dbmWattsSpots = List.generate(11, (index) {
           double y = graphWatts * (0.5 + index * 0.1);
           double x = 10 * log(y * 1000) / ln10;
           return FlSpot(x, y);
         });
         CacheManager.saveCache(CacheManager.wattsKey, watts);
+        CacheManager.addToHistory('Watts to dBm: $watts $_wattsUnit = $_dbmResult');
       });
     } catch (e) {
-      setState(() => _dbmWattsSpots = []);
+      setState(() {
+        _dbmResult = '';
+        _dbmWattsSpots = [];
+      });
     }
   }
 
@@ -100,6 +123,35 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('dBm ↔ Watts Converter'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () async {
+              final history = await CacheManager.getHistory();
+              if (!context.mounted) return;
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Calculation History'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: history.map((entry) => ListTile(title: Text(entry))).toList(),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            tooltip: 'View History',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -128,16 +180,16 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                       controller: _dbmController,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        labelText: 'Enter dBm',
+                        labelText: 'Enter Power (dBm)',
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
                       ),
                       onChanged: (value) {
                         setState(() {
-                          _wattsResult = Conversions.dbmToWatts(value);
                           _wattsController.clear();
-                          _updateGraphFromDbm(value);
+                          _wattsResult = ''; // Clear opposite result
+                          _updateFromDbm(value);
                         });
                       },
                     ),
@@ -166,22 +218,45 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: _wattsController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Enter Watts',
-                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceVariant,
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          _dbmResult = Conversions.wattsToDbm(value);
-                          _dbmController.clear();
-                          _updateGraphFromWatts(value);
-                        });
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _wattsController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: 'Enter Power',
+                              border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                              filled: true,
+                              fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _dbmController.clear();
+                                _dbmResult = ''; // Clear opposite result
+                                _updateFromWatts(value);
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        DropdownButton<String>(
+                          value: _wattsUnit,
+                          items: ['W', 'mW']
+                              .map((unit) => DropdownMenuItem(value: unit, child: Text(unit)))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _wattsUnit = value!;
+                              _dbmController.clear();
+                              _dbmResult = ''; // Clear opposite result
+                              if (_wattsController.text.isNotEmpty) {
+                                _updateFromWatts(_wattsController.text);
+                              }
+                            });
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Text('Result: $_dbmResult', style: Theme.of(context).textTheme.bodyLarge),

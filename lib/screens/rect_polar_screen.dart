@@ -68,6 +68,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
         _rectSpots = [FlSpot(graphX, graphY)];
         CacheManager.saveCache(CacheManager.realKey, real);
         CacheManager.saveCache(CacheManager.imagKey, imag);
+        CacheManager.addToHistory('Rect to Polar: ($real, $imag) = $_polarResult');
       });
     } catch (e) {
       setState(() => _rectSpots = []);
@@ -94,6 +95,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
         _rectSpots = [FlSpot(x, y)];
         CacheManager.saveCache(CacheManager.magKey, magnitude);
         CacheManager.saveCache(CacheManager.angleKey, angle);
+        CacheManager.addToHistory('Polar to Rect: ($magnitude, $angle°) = $_rectResult');
       });
     } catch (e) {
       setState(() => _rectSpots = []);
@@ -105,6 +107,35 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rectangular ↔ Polar Converter'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () async {
+              final history = await CacheManager.getHistory();
+              if (!context.mounted) return;
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Calculation History'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: history.map((entry) => ListTile(title: Text(entry))).toList(),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            tooltip: 'View History',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -140,9 +171,10 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                       ),
                       onChanged: (value) {
                         setState(() {
-                          _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
                           _magController.clear();
                           _angleController.clear();
+                          _rectResult = ''; // Clear opposite result
+                          _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
                           _updateGraphFromRect(_realController.text, _imagController.text);
                         });
                       },
@@ -159,9 +191,10 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                       ),
                       onChanged: (value) {
                         setState(() {
-                          _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
                           _magController.clear();
                           _angleController.clear();
+                          _rectResult = ''; // Clear opposite result
+                          _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
                           _updateGraphFromRect(_realController.text, _imagController.text);
                         });
                       },
@@ -202,9 +235,10 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                       ),
                       onChanged: (value) {
                         setState(() {
-                          _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
                           _realController.clear();
                           _imagController.clear();
+                          _polarResult = ''; // Clear opposite result
+                          _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
                           _updateGraphFromPolar(_magController.text, _angleController.text);
                         });
                       },
@@ -221,9 +255,10 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                       ),
                       onChanged: (value) {
                         setState(() {
-                          _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
                           _realController.clear();
                           _imagController.clear();
+                          _polarResult = ''; // Clear opposite result
+                          _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
                           _updateGraphFromPolar(_magController.text, _angleController.text);
                         });
                       },
