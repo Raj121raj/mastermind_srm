@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/conversions.dart';
 import '../utils/cache_manager.dart';
+import 'tutorial_page.dart';
 
 class DbmWattsScreen extends StatefulWidget {
   const DbmWattsScreen({super.key});
@@ -27,6 +29,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
   late Animation<double> _fadeAnimation;
   bool _showDbmFormula = false;
   bool _showWattsFormula = false;
+  OverlayEntry? _overlayEntry;
 
   @override
   void initState() {
@@ -34,6 +37,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _loadCache();
+    _checkFirstRun();
   }
 
   @override
@@ -41,6 +45,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
     _animationController.dispose();
     _dbmController.dispose();
     _wattsController.dispose();
+    _overlayEntry?.remove();
     super.dispose();
   }
 
@@ -59,6 +64,59 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
         _updateFromWatts(wattsCached);
       });
     }
+  }
+
+  Future<void> _checkFirstRun() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstRun = prefs.getBool('firstRunDbmWatts') ?? true;
+    if (isFirstRun && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFirstRunOverlay();
+        prefs.setBool('firstRunDbmWatts', false);
+      });
+    }
+  }
+
+  void _showFirstRunOverlay() {
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Center(
+        child: Material(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Welcome to RF Calculator!',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Convert dBm to Watts and more. Tap "?" for a tutorial!',
+                    style: TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _overlayEntry?.remove();
+                      _overlayEntry = null;
+                    },
+                    child: const Text('Got It'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
   }
 
   void _updateFromDbm(String dbm) {
@@ -166,12 +224,43 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
     }
   }
 
+  void _applyDbmPreset(String preset) {
+    setState(() {
+      _dbmController.text = preset.split(': ')[1].replaceAll(' dBm', '');
+      _wattsController.clear();
+      _wattsResult = '';
+      _updateFromDbm(_dbmController.text);
+    });
+  }
+
+  void _applyWattsPreset(String preset) {
+    final parts = preset.split(': ');
+    final valueUnit = parts[1].split(' ');
+    setState(() {
+      _wattsController.text = valueUnit[0];
+      _wattsUnit = valueUnit[1];
+      _dbmController.clear();
+      _dbmResult = '';
+      _updateFromWatts(_wattsController.text);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('dBm ↔ Watts Converter'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TutorialPage()),
+              );
+            },
+            tooltip: 'Tutorial',
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () async {
@@ -251,6 +340,19 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
                           _wattsResult = '';
                           _updateFromDbm(value);
                         });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButton<String>(
+                      hint: const Text('Select Example'),
+                      value: null,
+                      items: [
+                        'Wi-Fi: 20 dBm',
+                        'Bluetooth: 0 dBm',
+                        'High Power: 50 dBm',
+                      ].map((preset) => DropdownMenuItem(value: preset, child: Text(preset))).toList(),
+                      onChanged: (value) {
+                        if (value != null) _applyDbmPreset(value);
                       },
                     ),
                     const SizedBox(height: 12),
@@ -363,6 +465,19 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> with SingleTickerProvid
                           },
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButton<String>(
+                      hint: const Text('Select Example'),
+                      value: null,
+                      items: [
+                        'Wi-Fi: 0.1 W',
+                        'Bluetooth: 1 mW',
+                        'High Power: 100 W',
+                      ].map((preset) => DropdownMenuItem(value: preset, child: Text(preset))).toList(),
+                      onChanged: (value) {
+                        if (value != null) _applyWattsPreset(value);
+                      },
                     ),
                     const SizedBox(height: 12),
                     Row(

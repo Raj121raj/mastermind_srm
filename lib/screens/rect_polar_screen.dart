@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/conversions.dart';
 import '../utils/cache_manager.dart';
+import 'tutorial_page.dart';
 
 class RectPolarScreen extends StatefulWidget {
   const RectPolarScreen({super.key});
@@ -30,6 +32,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
   late Animation<double> _fadeAnimation;
   bool _showRectFormula = false;
   bool _showPolarFormula = false;
+  OverlayEntry? _overlayEntry;
 
   @override
   void initState() {
@@ -37,6 +40,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _loadCache();
+    _checkFirstRun();
   }
 
   @override
@@ -46,6 +50,7 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
     _imagController.dispose();
     _magController.dispose();
     _angleController.dispose();
+    _overlayEntry?.remove();
     super.dispose();
   }
 
@@ -72,6 +77,59 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
         _updateGraphFromPolar();
       });
     }
+  }
+
+  Future<void> _checkFirstRun() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstRun = prefs.getBool('firstRunRectPolar') ?? true;
+    if (isFirstRun && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFirstRunOverlay();
+        prefs.setBool('firstRunRectPolar', false);
+      });
+    }
+  }
+
+  void _showFirstRunOverlay() {
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Center(
+        child: Material(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Welcome to RF Calculator!',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Convert coordinates and more. Tap "?" for a tutorial!',
+                    style: TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _overlayEntry?.remove();
+                      _overlayEntry = null;
+                    },
+                    child: const Text('Got It'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
   }
 
   void _addRectPoint() {
@@ -206,12 +264,40 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
     }
   }
 
+  void _applyRectPreset(String preset) {
+    final parts = preset.split(': ')[1].replaceAll('(', '').replaceAll(')', '').split(', ');
+    setState(() {
+      _realController.text = parts[0];
+      _imagController.text = parts[1];
+      _addRectPoint();
+    });
+  }
+
+  void _applyPolarPreset(String preset) {
+    final parts = preset.split(': ')[1].replaceAll('(', '').replaceAll(')', '').split(', ');
+    setState(() {
+      _magController.text = parts[0];
+      _angleController.text = parts[1].replaceAll('°', '');
+      _addPolarPoint();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rectangular ↔ Polar Converter'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TutorialPage()),
+              );
+            },
+            tooltip: 'Tutorial',
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () async {
@@ -305,6 +391,19 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                     ElevatedButton(
                       onPressed: _addRectPoint,
                       child: const Text('Add Point'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButton<String>(
+                      hint: const Text('Select Example'),
+                      value: null,
+                      items: [
+                        'Point 1: (3, 4)',
+                        'Point 2: (1, 1)',
+                        'Point 3: (-2, 2)',
+                      ].map((preset) => DropdownMenuItem(value: preset, child: Text(preset))).toList(),
+                      onChanged: (value) {
+                        if (value != null) _applyRectPreset(value);
+                      },
                     ),
                     const SizedBox(height: 12),
                     if (_rectPoints.isNotEmpty) ...[
@@ -424,6 +523,19 @@ class _RectPolarScreenState extends State<RectPolarScreen> with SingleTickerProv
                     ElevatedButton(
                       onPressed: _addPolarPoint,
                       child: const Text('Add Point'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButton<String>(
+                      hint: const Text('Select Example'),
+                      value: null,
+                      items: [
+                        'Point 1: (5, 45°)',
+                        'Point 2: (2, 90°)',
+                        'Point 3: (3, 180°)',
+                      ].map((preset) => DropdownMenuItem(value: preset, child: Text(preset))).toList(),
+                      onChanged: (value) {
+                        if (value != null) _applyPolarPreset(value);
+                      },
                     ),
                     const SizedBox(height: 12),
                     if (_polarPoints.isNotEmpty) ...[

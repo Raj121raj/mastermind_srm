@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/conversions.dart';
 import '../utils/cache_manager.dart';
+import 'tutorial_page.dart';
 
 class FreqWavelengthScreen extends StatefulWidget {
   const FreqWavelengthScreen({super.key});
@@ -27,6 +29,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
   late Animation<double> _fadeAnimation;
   bool _showFreqFormula = false;
   bool _showWavelengthFormula = false;
+  OverlayEntry? _overlayEntry;
 
   @override
   void initState() {
@@ -34,6 +37,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _loadCache();
+    _checkFirstRun();
   }
 
   @override
@@ -41,6 +45,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
     _animationController.dispose();
     _freqController.dispose();
     _wavelengthController.dispose();
+    _overlayEntry?.remove();
     super.dispose();
   }
 
@@ -59,6 +64,59 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
         _updateFromWavelength(wavelengthCached);
       });
     }
+  }
+
+  Future<void> _checkFirstRun() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstRun = prefs.getBool('firstRunFreqWavelength') ?? true;
+    if (isFirstRun && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showFirstRunOverlay();
+        prefs.setBool('firstRunFreqWavelength', false);
+      });
+    }
+  }
+
+  void _showFirstRunOverlay() {
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Center(
+        child: Material(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.8,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Welcome to RF Calculator!',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Convert frequency to wavelength and more. Tap "?" for a tutorial!',
+                    style: TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _overlayEntry?.remove();
+                      _overlayEntry = null;
+                    },
+                    child: const Text('Got It'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
   }
 
   void _updateFromFreq(String freq) {
@@ -119,6 +177,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
       double wavelengthValue = double.parse(wavelength);
       if (_wavelengthUnit == 'cm') wavelengthValue /= 100;
       else if (_wavelengthUnit == 'mm') wavelengthValue /= 1000;
+      else if (_wavelengthUnit == 'nm') wavelengthValue /= 1e9;
       if (wavelengthValue <= 0 || wavelengthValue.isNaN || wavelengthValue.isInfinite) {
         setState(() {
           _freqResult = '';
@@ -171,12 +230,46 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
     }
   }
 
+  void _applyFreqPreset(String preset) {
+    final parts = preset.split(': ');
+    final valueUnit = parts[1].split(' ');
+    setState(() {
+      _freqController.text = valueUnit[0];
+      _freqUnit = valueUnit[1];
+      _wavelengthController.clear();
+      _wavelengthResult = '';
+      _updateFromFreq(_freqController.text);
+    });
+  }
+
+  void _applyWavelengthPreset(String preset) {
+    final parts = preset.split(': ');
+    final valueUnit = parts[1].split(' ');
+    setState(() {
+      _wavelengthController.text = valueUnit[0];
+      _wavelengthUnit = valueUnit[1];
+      _freqController.clear();
+      _freqResult = '';
+      _updateFromWavelength(_wavelengthController.text);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Frequency ↔ Wavelength Converter'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TutorialPage()),
+              );
+            },
+            tooltip: 'Tutorial',
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             onPressed: () async {
@@ -282,6 +375,19 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
                       ],
                     ),
                     const SizedBox(height: 12),
+                    DropdownButton<String>(
+                      hint: const Text('Select Example'),
+                      value: null,
+                      items: [
+                        'Wi-Fi: 2.4 GHz',
+                        'AM Radio: 1 MHz',
+                        'Microwave: 10 GHz',
+                      ].map((preset) => DropdownMenuItem(value: preset, child: Text(preset))).toList(),
+                      onChanged: (value) {
+                        if (value != null) _applyFreqPreset(value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -376,7 +482,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
                         const SizedBox(width: 8),
                         DropdownButton<String>(
                           value: _wavelengthUnit,
-                          items: ['m', 'cm', 'mm']
+                          items: ['m', 'cm', 'mm', 'nm']
                               .map((unit) => DropdownMenuItem(value: unit, child: Text(unit)))
                               .toList(),
                           onChanged: (value) {
@@ -391,6 +497,19 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> with Single
                           },
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButton<String>(
+                      hint: const Text('Select Example'),
+                      value: null,
+                      items: [
+                        'Wi-Fi: 12.5 cm',
+                        'AM Radio: 300 m',
+                        'Laser: 500 nm',
+                      ].map((preset) => DropdownMenuItem(value: preset, child: Text(preset))).toList(),
+                      onChanged: (value) {
+                        if (value != null) _applyWavelengthPreset(value);
+                      },
                     ),
                     const SizedBox(height: 12),
                     Row(
