@@ -21,6 +21,8 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
   static const double _maxWavelengthGraph = 1000.0;
   String _freqUnit = 'Hz'; // Default unit
   String _wavelengthUnit = 'm'; // Default unit
+  String? _prevFreqValue; // Store previous Frequency input
+  String? _prevWavelengthValue; // Store previous Wavelength input
 
   @override
   void initState() {
@@ -68,6 +70,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
       }
       double graphFreq = min(freqValue, _maxFreqGraph);
       setState(() {
+        _prevFreqValue = _freqController.text; // Store previous value
         _wavelengthResult = Conversions.freqToWavelength(freqValue.toString());
         _freqWavelengthSpots = List.generate(11, (index) {
           double x = graphFreq * (0.5 + index * 0.1);
@@ -106,6 +109,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
       }
       double graphWavelength = min(wavelengthValue, _maxWavelengthGraph);
       setState(() {
+        _prevWavelengthValue = _wavelengthController.text; // Store previous value
         _freqResult = Conversions.wavelengthToFreq(wavelengthValue.toString());
         _freqWavelengthSpots = List.generate(11, (index) {
           double y = graphWavelength * (0.5 + index * 0.1);
@@ -119,6 +123,28 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
       setState(() {
         _freqResult = '';
         _freqWavelengthSpots = [];
+      });
+    }
+  }
+
+  void _undoFreq() {
+    if (_prevFreqValue != null) {
+      setState(() {
+        _freqController.text = _prevFreqValue!;
+        _wavelengthController.clear();
+        _freqResult = '';
+        _updateFromFreq(_prevFreqValue!);
+      });
+    }
+  }
+
+  void _undoWavelength() {
+    if (_prevWavelengthValue != null) {
+      setState(() {
+        _wavelengthController.text = _prevWavelengthValue!;
+        _freqController.clear();
+        _wavelengthResult = '';
+        _updateFromWavelength(_prevWavelengthValue!);
       });
     }
   }
@@ -192,11 +218,23 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               filled: true,
                               fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    _freqController.clear();
+                                    _wavelengthController.clear();
+                                    _wavelengthResult = '';
+                                    _freqResult = '';
+                                    _freqWavelengthSpots = [];
+                                  });
+                                },
+                              ),
                             ),
                             onChanged: (value) {
                               setState(() {
                                 _wavelengthController.clear();
-                                _wavelengthResult = ''; // Clear opposite result
+                                _wavelengthResult = '';
                                 _updateFromFreq(value);
                               });
                             },
@@ -212,7 +250,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                             setState(() {
                               _freqUnit = value!;
                               _wavelengthController.clear();
-                              _wavelengthResult = ''; // Clear opposite result
+                              _wavelengthResult = '';
                               if (_freqController.text.isNotEmpty) {
                                 _updateFromFreq(_freqController.text);
                               }
@@ -222,7 +260,18 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text('Result: $_wavelengthResult', style: Theme.of(context).textTheme.bodyLarge),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Result: $_wavelengthResult', style: Theme.of(context).textTheme.bodyLarge),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.undo),
+                          onPressed: _undoFreq,
+                          tooltip: 'Undo',
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -257,11 +306,23 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               filled: true,
                               fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    _wavelengthController.clear();
+                                    _freqController.clear();
+                                    _freqResult = '';
+                                    _wavelengthResult = '';
+                                    _freqWavelengthSpots = [];
+                                  });
+                                },
+                              ),
                             ),
                             onChanged: (value) {
                               setState(() {
                                 _freqController.clear();
-                                _freqResult = ''; // Clear opposite result
+                                _freqResult = '';
                                 _updateFromWavelength(value);
                               });
                             },
@@ -277,7 +338,7 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                             setState(() {
                               _wavelengthUnit = value!;
                               _freqController.clear();
-                              _freqResult = ''; // Clear opposite result
+                              _freqResult = '';
                               if (_wavelengthController.text.isNotEmpty) {
                                 _updateFromWavelength(_wavelengthController.text);
                               }
@@ -287,7 +348,18 @@ class _FreqWavelengthScreenState extends State<FreqWavelengthScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text('Result: $_freqResult', style: Theme.of(context).textTheme.bodyLarge),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Result: $_freqResult', style: Theme.of(context).textTheme.bodyLarge),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.undo),
+                          onPressed: _undoWavelength,
+                          tooltip: 'Undo',
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

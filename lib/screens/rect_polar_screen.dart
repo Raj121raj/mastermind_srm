@@ -20,6 +20,10 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
   final TextEditingController _angleController = TextEditingController();
   List<FlSpot> _rectSpots = [];
   static const double _maxValueGraph = 1000.0;
+  String? _prevRealValue; // Store previous Real input
+  String? _prevImagValue; // Store previous Imag input
+  String? _prevMagValue; // Store previous Magnitude input
+  String? _prevAngleValue; // Store previous Angle input
 
   @override
   void initState() {
@@ -65,6 +69,8 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
       double graphX = x.abs() > _maxValueGraph ? (_maxValueGraph * x.sign) : x;
       double graphY = y.abs() > _maxValueGraph ? (_maxValueGraph * y.sign) : y;
       setState(() {
+        _prevRealValue = real;
+        _prevImagValue = imag;
         _rectSpots = [FlSpot(graphX, graphY)];
         CacheManager.saveCache(CacheManager.realKey, real);
         CacheManager.saveCache(CacheManager.imagKey, imag);
@@ -92,6 +98,8 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
       double x = graphR * cos(thetaRad);
       double y = graphR * sin(thetaRad);
       setState(() {
+        _prevMagValue = magnitude;
+        _prevAngleValue = angle;
         _rectSpots = [FlSpot(x, y)];
         CacheManager.saveCache(CacheManager.magKey, magnitude);
         CacheManager.saveCache(CacheManager.angleKey, angle);
@@ -99,6 +107,34 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
       });
     } catch (e) {
       setState(() => _rectSpots = []);
+    }
+  }
+
+  void _undoRect() {
+    if (_prevRealValue != null && _prevImagValue != null) {
+      setState(() {
+        _realController.text = _prevRealValue!;
+        _imagController.text = _prevImagValue!;
+        _magController.clear();
+        _angleController.clear();
+        _rectResult = '';
+        _polarResult = Conversions.rectToPolar(_prevRealValue!, _prevImagValue!);
+        _updateGraphFromRect(_prevRealValue!, _prevImagValue!);
+      });
+    }
+  }
+
+  void _undoPolar() {
+    if (_prevMagValue != null && _prevAngleValue != null) {
+      setState(() {
+        _magController.text = _prevMagValue!;
+        _angleController.text = _prevAngleValue!;
+        _realController.clear();
+        _imagController.clear();
+        _polarResult = '';
+        _rectResult = Conversions.polarToRect(_prevMagValue!, _prevAngleValue!);
+        _updateGraphFromPolar(_prevMagValue!, _prevAngleValue!);
+      });
     }
   }
 
@@ -168,12 +204,26 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _realController.clear();
+                              _imagController.clear();
+                              _magController.clear();
+                              _angleController.clear();
+                              _polarResult = '';
+                              _rectResult = '';
+                              _rectSpots = [];
+                            });
+                          },
+                        ),
                       ),
                       onChanged: (value) {
                         setState(() {
                           _magController.clear();
                           _angleController.clear();
-                          _rectResult = ''; // Clear opposite result
+                          _rectResult = '';
                           _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
                           _updateGraphFromRect(_realController.text, _imagController.text);
                         });
@@ -188,19 +238,44 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _realController.clear();
+                              _imagController.clear();
+                              _magController.clear();
+                              _angleController.clear();
+                              _polarResult = '';
+                              _rectResult = '';
+                              _rectSpots = [];
+                            });
+                          },
+                        ),
                       ),
                       onChanged: (value) {
                         setState(() {
                           _magController.clear();
                           _angleController.clear();
-                          _rectResult = ''; // Clear opposite result
+                          _rectResult = '';
                           _polarResult = Conversions.rectToPolar(_realController.text, _imagController.text);
                           _updateGraphFromRect(_realController.text, _imagController.text);
                         });
                       },
                     ),
                     const SizedBox(height: 12),
-                    Text('Result: $_polarResult', style: Theme.of(context).textTheme.bodyLarge),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Result: $_polarResult', style: Theme.of(context).textTheme.bodyLarge),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.undo),
+                          onPressed: _undoRect,
+                          tooltip: 'Undo',
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -232,12 +307,26 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _magController.clear();
+                              _angleController.clear();
+                              _realController.clear();
+                              _imagController.clear();
+                              _polarResult = '';
+                              _rectResult = '';
+                              _rectSpots = [];
+                            });
+                          },
+                        ),
                       ),
                       onChanged: (value) {
                         setState(() {
                           _realController.clear();
                           _imagController.clear();
-                          _polarResult = ''; // Clear opposite result
+                          _polarResult = '';
                           _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
                           _updateGraphFromPolar(_magController.text, _angleController.text);
                         });
@@ -252,19 +341,44 @@ class _RectPolarScreenState extends State<RectPolarScreen> {
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _magController.clear();
+                              _angleController.clear();
+                              _realController.clear();
+                              _imagController.clear();
+                              _polarResult = '';
+                              _rectResult = '';
+                              _rectSpots = [];
+                            });
+                          },
+                        ),
                       ),
                       onChanged: (value) {
                         setState(() {
                           _realController.clear();
                           _imagController.clear();
-                          _polarResult = ''; // Clear opposite result
+                          _polarResult = '';
                           _rectResult = Conversions.polarToRect(_magController.text, _angleController.text);
                           _updateGraphFromPolar(_magController.text, _angleController.text);
                         });
                       },
                     ),
                     const SizedBox(height: 12),
-                    Text('Result: $_rectResult', style: Theme.of(context).textTheme.bodyLarge),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Result: $_rectResult', style: Theme.of(context).textTheme.bodyLarge),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.undo),
+                          onPressed: _undoPolar,
+                          tooltip: 'Undo',
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

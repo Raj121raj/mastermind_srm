@@ -19,8 +19,10 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
   List<FlSpot> _dbmWattsSpots = [];
   static const double _maxDbmGraph = 100.0;
   static const double _maxWattsGraph = 10000.0;
-  String _dbmUnit = 'dBm'; // Fixed unit, no dropdown needed
+  String _dbmUnit = 'dBm'; // Fixed unit
   String _wattsUnit = 'W'; // Default unit
+  String? _prevDbmValue; // Store previous dBm input
+  String? _prevWattsValue; // Store previous Watts input
 
   @override
   void initState() {
@@ -64,6 +66,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
       }
       double graphDbm = min(dbmValue, _maxDbmGraph);
       setState(() {
+        _prevDbmValue = _dbmController.text; // Store previous value
         _wattsResult = Conversions.dbmToWatts(dbmValue.toString());
         _dbmWattsSpots = List.generate(11, (index) {
           double x = graphDbm - 5 + index;
@@ -101,6 +104,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
       }
       double graphWatts = min(wattsValue, _maxWattsGraph);
       setState(() {
+        _prevWattsValue = _wattsController.text; // Store previous value
         _dbmResult = Conversions.wattsToDbm(wattsValue.toString());
         _dbmWattsSpots = List.generate(11, (index) {
           double y = graphWatts * (0.5 + index * 0.1);
@@ -114,6 +118,28 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
       setState(() {
         _dbmResult = '';
         _dbmWattsSpots = [];
+      });
+    }
+  }
+
+  void _undoDbm() {
+    if (_prevDbmValue != null) {
+      setState(() {
+        _dbmController.text = _prevDbmValue!;
+        _wattsController.clear();
+        _wattsResult = '';
+        _updateFromDbm(_prevDbmValue!);
+      });
+    }
+  }
+
+  void _undoWatts() {
+    if (_prevWattsValue != null) {
+      setState(() {
+        _wattsController.text = _prevWattsValue!;
+        _dbmController.clear();
+        _dbmResult = '';
+        _updateFromWatts(_prevWattsValue!);
       });
     }
   }
@@ -184,17 +210,40 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                         border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                         filled: true,
                         fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _dbmController.clear();
+                              _wattsController.clear();
+                              _wattsResult = '';
+                              _dbmResult = '';
+                              _dbmWattsSpots = [];
+                            });
+                          },
+                        ),
                       ),
                       onChanged: (value) {
                         setState(() {
                           _wattsController.clear();
-                          _wattsResult = ''; // Clear opposite result
+                          _wattsResult = '';
                           _updateFromDbm(value);
                         });
                       },
                     ),
                     const SizedBox(height: 12),
-                    Text('Result: $_wattsResult', style: Theme.of(context).textTheme.bodyLarge),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Result: $_wattsResult', style: Theme.of(context).textTheme.bodyLarge),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.undo),
+                          onPressed: _undoDbm,
+                          tooltip: 'Undo',
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -229,11 +278,23 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                               border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                               filled: true,
                               fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    _wattsController.clear();
+                                    _dbmController.clear();
+                                    _dbmResult = '';
+                                    _wattsResult = '';
+                                    _dbmWattsSpots = [];
+                                  });
+                                },
+                              ),
                             ),
                             onChanged: (value) {
                               setState(() {
                                 _dbmController.clear();
-                                _dbmResult = ''; // Clear opposite result
+                                _dbmResult = '';
                                 _updateFromWatts(value);
                               });
                             },
@@ -249,7 +310,7 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                             setState(() {
                               _wattsUnit = value!;
                               _dbmController.clear();
-                              _dbmResult = ''; // Clear opposite result
+                              _dbmResult = '';
                               if (_wattsController.text.isNotEmpty) {
                                 _updateFromWatts(_wattsController.text);
                               }
@@ -259,7 +320,18 @@ class _DbmWattsScreenState extends State<DbmWattsScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Text('Result: $_dbmResult', style: Theme.of(context).textTheme.bodyLarge),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Result: $_dbmResult', style: Theme.of(context).textTheme.bodyLarge),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.undo),
+                          onPressed: _undoWatts,
+                          tooltip: 'Undo',
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
