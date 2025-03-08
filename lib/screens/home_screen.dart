@@ -1,9 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; // Import for launching URLs
 import 'calculator_screen.dart';
 import 'resource_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  void _launchSRMWebsite() async {
+    final Uri url = Uri.parse('https://www.srmist.edu.in');
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication, // Forces external browser
+      );
+    } else {
+      debugPrint('Could not launch $url');  // Debugging log
+      throw Exception('Could not launch $url');
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +33,18 @@ class HomeScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Clickable SRM logo
+            GestureDetector(
+              onTap: _launchSRMWebsite, // Opens the SRM website when tapped
+              child: Image.asset(
+                'assets/university_logo.png', // Ensure this file exists in assets
+                height: 100,
+                width: 100,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
             const Text(
               "SRM INSTITUTE OF SCIENCE AND TECHNOLOGY",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
